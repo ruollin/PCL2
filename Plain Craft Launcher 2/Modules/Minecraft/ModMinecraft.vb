@@ -2131,8 +2131,46 @@ OnLoaded:
     Public Function McLibGet(Original As String, Optional WithHead As Boolean = True, Optional IgnoreLiteLoader As Boolean = False, Optional CustomMcFolder As String = Nothing) As String
         CustomMcFolder = If(CustomMcFolder, PathMcFolder)
         Dim Splited = Original.Split(":")
+        Dim GroupId, ArtifactId, VersionStr, Classifier, Packaging As String
+        GroupId = Nothing
+        ArtifactId = Nothing
+        VersionStr = Nothing
+        Classifier = Nothing
+        Packaging = Nothing
+
+        Select Case Splited.Length
+            Case 3
+                VersionStr = Splited(2)
+                Packaging = "jar"
+            Case 4
+                Dim Suffix As New List(Of String)({ "zip", "pom", "jar" })
+                If Suffix.Contains(Splited(2).ToLower()) Then
+                    Packaging = Splited(2)
+                    VersionStr = Splited(3)
+                Else
+                    VersionStr = Splited(2)
+                    Classifier = Splited(3)
+                    Packaging = "jar"
+                End If
+            Case 5
+                Packaging = Splited(2)
+                Classifier = Splited(3)
+                VersionStr = Splited(4)
+            Case Else
+                Throw New FormatException("无效的 Maven 包名: " & Original)
+        End Select
+        GroupId = Splited(0)
+        ArtifactId = Splited(1)
+        
+        ' 文件名拼接
+        Dim fileName As String = ArtifactId & "-" & VersionStr
+        If Not String.IsNullOrEmpty(Classifier) Then
+            fileName &= "-" & Classifier
+        End If
+        fileName &= "." & If(String.IsNullOrEmpty(Packaging), "jar", Packaging)
+
         McLibGet = If(WithHead, CustomMcFolder & "libraries\", "") &
-                   Splited(0).Replace(".", "\") & "\" & Splited(1) & "\" & Splited(2) & "\" & Splited(1) & "-" & Splited(2) & ".jar"
+                GroupId.Replace(".", "\") & "\" & ArtifactId & "\" & VersionStr & "\" & fileName
         '判断 OptiFine 是否应该使用 installer
         If McLibGet.Contains("optifine\OptiFine\1.") AndAlso Splited(2).Split(".").Count > 1 Then
             Dim MajorVersion As Integer = Val(Splited(2).Split(".")(1).BeforeFirst("_"))
